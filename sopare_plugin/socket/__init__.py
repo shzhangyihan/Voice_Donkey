@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright (C) 2015 - 2018 Martin Kauss (yo@bishoph.org)
+Copyright (C) 2015 - 2017 Martin Kauss (yo@bishoph.org)
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may
 not use this file except in compliance with the License. You may obtain
@@ -17,23 +17,17 @@ License for the specific language governing permissions and limitations
 under the License.
 """
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as pyplot
-from sopare.path import __plotdestination__
+# Plugin for sending analysis to socket servers
+from socket import socket
+import sys
 
-class visual:
+HOST = 'ZhangYihandeMBP.attlocal.net'
+PORT = 8888
+s = socket(AF_INET, SOCK_STREAM)
+s.connect((HOST, PORT))
+print "HELLOHELLOHELLOHELLO"
 
-    def __init__(self):
-        self.plot_cache = [ ]
-
-    def create_sample(self, data, filename):
-        pyplot.plot(data)
-        pyplot.savefig(__plotdestination__+filename)
-        pyplot.clf()
-
-    def extend_plot_cache(self, data):
-        self.plot_cache.extend(data)
-
-    def get_plot_cache(self):
-        return self.plot_cache
+def run(readable_results, data, rawbuf):
+    for r in readable_results:
+        print r
+        s.send(r)
