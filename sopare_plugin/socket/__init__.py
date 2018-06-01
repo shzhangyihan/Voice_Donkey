@@ -21,8 +21,10 @@ under the License.
 from socket import socket
 import sys
 
-HOST = 'ZhangYihandeMBP.attlocal.net'
+#HOST = gethostbyname('localhost')
+HOST = '192.168.8.127'
 PORT = 8888
+print HOST
 s = socket(AF_INET, SOCK_STREAM)
 s.connect((HOST, PORT))
 print "HELLOHELLOHELLOHELLO"
