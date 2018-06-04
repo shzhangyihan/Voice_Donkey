@@ -4,6 +4,8 @@ import array
 import time
 import struct
 from threading import Thread
+import _thread
+import multiprocessing
 
 #import for syntactical ease
 from donkeycar.parts.web_controller.web import LocalWebController
@@ -341,21 +343,33 @@ class JoystickController(object):
         self.button_up_trigger_map = {}
         self.axis_trigger_map = {}
         self.init_trigger_maps()
-        print self.create_socket_server()
-                
+        self.queue = multiprocessing.Queue()
+    
+    def queue_commands(self, s, queue_t):
+        while 1:
+            conn, addr = s.accept()
+            print ('Connected with ' + addr[0] + ':' + str(addr[1]))
+            
+            while 1:
+                data = conn.recv(1024)
+                if data:
+                    #print (data)
+                    queue_t.put(data)
+     
     def create_socket_server(self):
         self.HOST = '192.168.8.127'
         self.PORT = 8888
         self.sID = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print 'Socket created'
+        print ('Socket created')
         try:
-            s.bind((HOST, PORT))
+            self.sID.bind((self.HOST, self.PORT))
         except socket.error as msg:
-            print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+            print ('Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
             sys.exit()
-        print 'Socket bind complete'
-        s.listen(10)
-        print 'Socket now listening'
+        print ('Socket bind complete')
+        self.sID.listen(10)
+        print ('Socket now listening')
+        _thread.start_new_thread(self.queue_commands, (self.sID, self.queue, ))
         return self.sID
 
     def init_js(self):
@@ -430,17 +444,19 @@ class JoystickController(object):
         self.constant_throttle = False
         self.estop_state = self.ES_START
         self.throttle = 0.0
-
+    
     def update(self):
         '''
         poll a joystick for input events
         '''
-
+        self.create_socket_server()        
         #wait for joystick to be online
         while self.running and self.js is None and not self.init_js():
             time.sleep(5)
 
         while self.running:
+            c = self.queue.get()
+            print (c)
             button, button_state, axis, axis_val = self.js.poll()
 
             if axis is not None and axis in self.axis_trigger_map:
@@ -765,3 +781,7 @@ if __name__ == "__main__":
     '''
     p = JoyStickPub()
     p.run()
+
+
+
+
