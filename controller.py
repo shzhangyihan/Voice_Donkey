@@ -1,11 +1,13 @@
 
-import socket
+
 import array
 import time
 import struct
+import random
 from threading import Thread
 import _thread
 import multiprocessing
+import socket
 
 #import for syntactical ease
 from donkeycar.parts.web_controller.web import LocalWebController
@@ -24,7 +26,14 @@ class Joystick(object):
 
 
     def init(self):
-        from fcntl import ioctl
+        try:
+            from fcntl import ioctl
+        except ModuleNotFoundError:
+            self.num_axes = 0
+            self.num_buttons = 0
+            print("no support for fnctl module. joystick not enabled.")
+            return            
+            
         '''
         call once to setup connection to device and map buttons
         '''
@@ -87,6 +96,9 @@ class Joystick(object):
         button_state = None
         axis = None
         axis_val = None
+
+        if self.jsdev is None:
+            return button, button_state, axis, axis_val
 
         # Main event loop
         evbuf = self.jsdev.read(8)
@@ -338,13 +350,14 @@ class JoystickController(object):
         self.tub = None
         self.num_records_to_erase = 100
         self.estop_state = self.ES_IDLE
+        self.chaos_monkey_steering = None
         
         self.button_down_trigger_map = {}
         self.button_up_trigger_map = {}
         self.axis_trigger_map = {}
         self.init_trigger_maps()
         self.queue = multiprocessing.Queue()
-    
+
     def queue_commands(self, s, queue_t):
         while 1:
             conn, addr = s.accept()
@@ -357,8 +370,8 @@ class JoystickController(object):
                     queue_t.put(data)
      
     def create_socket_server(self):
-        self.HOST = '192.168.8.127'
-        self.PORT = 8888
+        self.HOST = '172.16.1.17'
+        self.PORT = 8889
         self.sID = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print ('Socket created')
         try:
@@ -444,19 +457,32 @@ class JoystickController(object):
         self.constant_throttle = False
         self.estop_state = self.ES_START
         self.throttle = 0.0
-    
+
     def update(self):
         '''
         poll a joystick for input events
         '''
-        self.create_socket_server()        
+
         #wait for joystick to be online
         while self.running and self.js is None and not self.init_js():
             time.sleep(5)
 
+        self.create_socket_server()        
+        
         while self.running:
-            c = self.queue.get()
-            print (c)
+            try:
+                c = self.queue.get(False)
+                print (c)
+            except:
+                c = None
+            if c == b'stop':
+                self.emergency_stop()
+            if c == b'go':
+                self.toggle_constant_throttle
+            if c == b'faster':
+                self.increase_max_throttle()
+            if c == b'slower':
+                self.decrease_max_throttle()
             button, button_state, axis, axis_val = self.js.poll()
 
             if axis is not None and axis in self.axis_trigger_map:
@@ -553,6 +579,15 @@ class JoystickController(object):
             self.mode = 'user'
         print('new mode:', self.mode)
 
+    def chaos_monkey_on_left(self):
+        self.chaos_monkey_steering = random.uniform(-1.0, -0.1)
+
+    def chaos_monkey_on_right(self):
+        self.chaos_monkey_steering = random.uniform(1.0, 0.1)
+
+    def chaos_monkey_off(self):
+        self.chaos_monkey_steering = None
+
     def run_threaded(self, img_arr=None):
         self.img_arr = img_arr
 
@@ -575,6 +610,9 @@ class JoystickController(object):
                 if self.throttle >= 0.0:
                     self.estop_state = self.ES_IDLE
                 return 0.0, self.throttle, self.mode, False
+
+        if self.chaos_monkey_steering is not None:
+            return self.chaos_monkey_steering, self.throttle, self.mode, False
 
         return self.angle, self.throttle, self.mode, self.recording
 
@@ -649,6 +687,13 @@ class PS3JoystickController(JoystickController):
             'dpad_up' : self.increase_max_throttle,
             'dpad_down' : self.decrease_max_throttle,
             'start' : self.toggle_constant_throttle,
+            "R1" : self.chaos_monkey_on_right,
+            "L1" : self.chaos_monkey_on_left,
+        }
+
+        self.button_up_trigger_map = {
+            "R1" : self.chaos_monkey_off,
+            "L1" : self.chaos_monkey_off,
         }
 
         self.axis_trigger_map = {
@@ -781,7 +826,4 @@ if __name__ == "__main__":
     '''
     p = JoyStickPub()
     p.run()
-
-
-
 
