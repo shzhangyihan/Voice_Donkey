@@ -477,12 +477,24 @@ class JoystickController(object):
                 c = None
             if c == b'stop':
                 self.emergency_stop()
-            if c == b'go':
-                self.toggle_constant_throttle
-            if c == b'faster':
-                self.increase_max_throttle()
-            if c == b'slower':
-                self.decrease_max_throttle()
+                while True:
+                    try:
+                        c = self.queue.get(False)
+                        print (c)
+                    except:
+                        c = None
+                    if c == b'go':
+                        break
+
+            if c == b'drive':
+                self.mode = 'local'
+
+            if c == b'steer':
+                self.mode = 'local_angle'
+
+            if c == b'user':
+                self.mode = 'user'
+
             button, button_state, axis, axis_val = self.js.poll()
 
             if axis is not None and axis in self.axis_trigger_map:
